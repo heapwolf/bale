@@ -23,6 +23,7 @@ least one public value or function.
 This is the entry point for your program.
 
 ```cpp
+// import local file (./helloworld.cc) as hello
 import hello "./helloworld.cc";
 
 int main() {
@@ -37,41 +38,52 @@ A module that can be imported by `main.cc`.
 #include <iostream>
 
 //
-// anything outside of export will be global
+// GLOBAL
 //
+// anything outside of export will be global,
+// this will be accessible from ANY file. you
+// should not put anything here unless you REALLY MEAN TO.
+//
+
 export {
 
   //
-  // implicitly private
-  // variables that are not exported
+  // implicitly private -- local variables
+  // variables defined here are not exported
+  // (including varibles imported from other modules)
   //
   int num = 10;
-  import awesome "./cc_modules/awesome/index.cc";
 
   //
-  // explicitly public
+  // import awesome/index.cc 
+  //
+
+  import awesome "./awesome.cc";
+
+  //
+  // explicitly public -- exported variables
   //
   public:
 
     void doSomething(string s) {
-      std::cout << s << awesome.stuff(num) << endl;
+      std::cout << s << awesome.square(num) << endl;
     }
 
   //
-  // explicitly private
+  // explicitly private -- switch back into local mode after export
   //
   private:
     int x = 0;
 }
 ```
 
-## ./CC_MODULES/AWESOME/INDEX.CC
+## ./AWESOME.CC
 This file happens to be included by `helloworld.cc`.
 
 ```cpp
 export {
   public:
-    int stuff(int i) {
+    int square(int i) {
       return i*i;
     }
 }
