@@ -19,7 +19,9 @@ A modue is a discrete unit of code, encapsulated in a file, which exposes at
 least one public value or function. 
 
 
-## MAIN.CC
+## ./MAIN.CC
+This is the entry point for your program.
+
 ```cpp
 import hello "./helloworld.cc";
 
@@ -29,7 +31,8 @@ int main() {
 ```
 
 
-## HELLOWORLD.CC
+## ./HELLOWORLD.CC
+A module that can be imported by `main.cc`.
 ```cpp
 #include <iostream>
 
@@ -40,6 +43,7 @@ export {
 
   //
   // implicitly private
+  // variables that are not exported
   //
   int num = 10;
   import awesome "./cc_modules/awesome/index.cc";
@@ -61,7 +65,9 @@ export {
 }
 ```
 
-## AWESOME.CC
+## ./CC_MODULES/AWESOME/INDEX.CC
+This file happens to be included by `helloworld.cc`.
+
 ```cpp
 export {
   public:
