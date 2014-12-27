@@ -33,35 +33,37 @@ int main() {
 
 
 ## ./HELLOWORLD.CC
-A module that can be imported by `main.cc`.
+The module imported by the code in `main.cc`.
+
 ```cpp
 #include <iostream>
 
 //
-// GLOBAL
+// GLOBAL SCOPE
 //
-// anything outside of export will be global,
-// this will be accessible from ANY file. you
-// should not put anything here unless you REALLY MEAN TO.
+// Anything outside of export will be global, this will be 
+// accessible from ANY file. you should not put anything here 
+// unless you REALLY MEAN TO.
 //
 
 export {
 
   //
-  // implicitly private -- local variables
-  // variables defined here are not exported
-  // (including varibles imported from other modules)
+  // MODULE SCOPE
+  //
+  // Variables defined here are implicitly private, they are
+  // not exported, this applies to varibles imported from other 
+  // modules.
   //
   int num = 10;
 
   //
   // import ./awesome.cc 
   //
-
   import awesome "./awesome.cc";
 
   //
-  // explicitly public -- exported variables
+  // Variables found after the "public:" label are exported!
   //
   public:
 
@@ -70,7 +72,8 @@ export {
     }
 
   //
-  // explicitly private -- switch back into local mode after export
+  // You can switch back and forth between public and private
+  // by using the "private:" label.
   //
   private:
     int x = 0;
@@ -94,7 +97,12 @@ It's important to tell `gcc`, `clang` (or whatever) where your
 precompiled headers can be found...
 
 ```bash
-bale ./main.cc ./out/main.cc
+bale <input-file> <output-directory>
+```
+
+### EXAMPLE
+```bash
+bale ./main.cc ./out
 g++ ./out/main.cc -std=c++1y -o main -include-pch ./out
 ```
 

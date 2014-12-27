@@ -19,10 +19,10 @@ typedef vector<const string> Defines;
 typedef map<const string, pair<const string, const string> > Imports;
 
 vector<const string> include_cache;
-map<const string, const string> import_cache;
+map<const string, pair<const string, const string> > import_cache;
 int depth = 0;
 
-regex importRE("import\\s+(\\w+)\\s+\"(.*(?!\\/))\";");
+regex importRE("import\\s+(\\w+)\\s+\"(.*)\";");
 regex exportStartRE("export\\s*(\\w+)\\s*\\{");
 regex exportEndRE("\\}(\\s*)$");
 
@@ -56,39 +56,100 @@ Imports find_imports (string data) {
 }
 
 
-void createClassIds(const char* path, Callback<fs::Error> cb) {
+void resolveImport(const char* path, Callback<fs::Error, const string> cb) {
 
-  filesystem.readFile(path, [&](auto err, auto data) {
+  bool isPath = path[0] == '/' || path[0] == '.';
+  fs::Error pathReference;
 
-    depth++;
+  if (isPath) {
+    cb(pathReference, string(path));
+    return;
+  }
 
-    auto imports = find_imports(data);
-    int counter = imports.size();
+  string name = string(path);
 
-    if (import_cache.find(path) == import_cache.end()) {
-      stringstream nextName;
+  auto die = [&]() {
+    fs::Error notFound;
+    notFound.message = "Module not found: " + name;
+    notFound.code = 1;
+    cb(notFound, name); 
+  };
 
-      nextName << "MODULE" << hex << depth << "_H";
-      import_cache.insert({ path, nextName.str() });
-    }
+  function<void(string)> visit;
+  visit = [&](string p) {
 
-    if (counter == 0) {
+    filesystem.stat(string(p + "/cc_modules").c_str(), [&](auto err, auto stats) {
+      if (err) {
+
+        unsigned found = p.find_last_of("/\\");
+        string parent = p.substr(0, found);
+
+        if (parent.length() == 0) {
+          die();
+          return;
+        }
+
+        visit(parent); 
+      }
+
+      string newpath = p + "/cc_modules/" + name + "/index.cc";
+      filesystem.stat(newpath.c_str(), [&](auto err, auto stats) {
+        if (err) {
+          die();
+          return;
+        }
+        cb(err, newpath);
+      });
+    });
+  };
+  
+  visit(filesystem.cwd());
+}
+
+
+void createClassIds(const char* value, Callback<fs::Error> cb) {
+
+  resolveImport(value, [&](auto err, auto path) {
+    if (err) {
       cb(err);
       return;
     }
 
-    for (auto& import : imports) {
+    filesystem.readFile(path.c_str(), [&](auto err, auto data) {
+      if (err) {
+        cb(err);
+        return;
+      }
 
-      auto path = get<1>(import.second).c_str();
+      depth++;
 
-      createClassIds(path, [&](auto err) {
-        counter = counter - 1;
-        if (counter == 0) {
-          cb(err);
-        }
-      });
-    }
+      auto imports = find_imports(data);
+      int counter = imports.size();
 
+      if (import_cache.find(value) == import_cache.end()) {
+
+        string id = "MODULE" + to_string(depth) + "_H";
+        import_cache.insert({ value, make_pair(path, id) });
+      }
+
+      if (counter == 0) {
+        cb(err);
+        return;
+      }
+
+      for (auto& import : imports) {
+
+        auto path = get<1>(import.second).c_str();
+
+        createClassIds(path, [&](auto err) {
+          counter = counter - 1;
+          if (counter == 0) {
+            cb(err);
+          }
+        });
+      }
+
+    });
   });
 }
 
@@ -99,26 +160,46 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
 
   for (auto& import : import_cache) {
 
-    auto filepath = import.first.c_str();
-    filesystem.readFile(filepath, [&](auto err, auto data) {
+      auto filepath = get<0>(import.second);
+      auto id = get<1>(import.second);
 
+    filesystem.readFile(filepath.c_str(), [&](auto err, auto data) {
       auto imports = find_imports(data);
 
-      if (++index < cache_size)
-        data = wrap(data, import_cache.at(filepath));
+      if (id != "MODULE1_H")
+        data = wrap(data, get<1>(import.second));
 
       for (auto& i : imports) {
-        auto importpath = import_cache.at(get<1>(i.second));
-        auto importname = get<0>(i.second);
-        string statement = importpath + " " + importname + ";";
+        // the identity of the new class 
+        auto importname = get<1>(import_cache[get<1>(i.second)]);
+
+        // the actual path to the file
+        auto importpath = get<0>(import_cache[get<1>(i.second)]);
+
+        string statement = importname + " " + get<0>(i.second) + ";";
         data = regex_replace(data, regex(i.first), statement);
       }
 
-      string filename = (index < cache_size)
+      string filename = (id != "MODULE1_H")
         ? string(filepath) + ".h"
-        : string(path)
+        : string(filepath)
       ;
 
+      if (filename[0] == '/') {
+        filename = filename.substr(
+          filesystem.cwd().length(), 
+          filename.length()
+        );
+      }
+      else if (filename[0] == '.') {
+        filename = filename.substr(
+          1,
+          filename.length()
+        );
+      }
+    
+      filename = path + filename;
+        
       log << log.info << "Writing " << filename << endl;
 
       filesystem.writeFile(filename.c_str(), data, [&](auto err) {
@@ -128,10 +209,11 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
           return;
         }
 
-        if (index == cache_size) {
+        if (++index == cache_size) {
           cb(err);
         }
       });
+
     });
   }
 }
