@@ -61,7 +61,7 @@ export {
 }
 ```
 
-## INDEX.CC
+## AWESOME.CC
 ```cpp
 export {
   public:
