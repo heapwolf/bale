@@ -15,9 +15,8 @@ Experimental. A work in progress.
 
 
 # EXAMPLE MODULE USAGE
-A modue is a descrete unit of code, encapsulated in a file, which exposes at 
-least one public value or function. The following code describes the _usage_ 
-of a module.
+A modue is a discrete unit of code, encapsulated in a file, which exposes at 
+least one public value or function. 
 
 
 ## MAIN.CC
