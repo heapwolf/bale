@@ -55,7 +55,7 @@ export {
   int num = 10;
 
   //
-  // import awesome/index.cc 
+  // import ./awesome.cc 
   //
 
   import awesome "./awesome.cc";
