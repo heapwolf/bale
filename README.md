@@ -1,5 +1,5 @@
 # SYNOPSIS
-A binary executable that compiles modules of C++ code.
+A binary executable that transpiles modules of C++ code.
 
 
 # MOTIVATION
@@ -49,7 +49,7 @@ int main() {
   math.add(2, 2);
 }
 ```
-To understand how a `module` is imported, read 
+To understand how the math `module` is imported, read 
 [`this`](http://nodejs.org/api/modules.html#modules_loading_from_node_modules_folders).
 
 
@@ -127,15 +127,15 @@ export {
 
 
 # USAGE
-It's important to tell `gcc`, `clang` (or whatever) where your 
-precompiled headers can be found...
-
 ```bash
 bale input.cc output.cc
 ```
 
 
 ## EXAMPLE
+It's important to tell `gcc`, `clang` (or whatever you use) where 
+your precompiled headers can be found...
+
 ```bash
 bale main.cc build.cc
 g++ build.cc -std=c++1y -o main -include-pch cc_modues/.build
