@@ -51,6 +51,7 @@ int main() {
 To understand how a `module` is imported, read 
 [`this`](http://nodejs.org/api/modules.html#modules_loading_from_node_modules_folders).
 
+
 ## ./HELLOWORLD.CC
 The module imported by the code in `main.cc`.
 
@@ -99,6 +100,7 @@ export {
 }
 ```
 
+
 ## ./AWESOME.CC
 This file happens to be included by `helloworld.cc`.
 
@@ -111,17 +113,19 @@ export {
 }
 ```
 
+
 ## USAGE
 It's important to tell `gcc`, `clang` (or whatever) where your 
 precompiled headers can be found...
 
 ```bash
-bale <input-file> <output-directory>
+bale input.cc output.cc
 ```
+
 
 ### EXAMPLE
 ```bash
-bale main.cc out.cc
-g++ out.cc -std=c++1y -o main -include-pch cc_modues/.build
+bale main.cc build.cc
+g++ build.cc -std=c++1y -o main -include-pch cc_modues/.build
 ```
 
