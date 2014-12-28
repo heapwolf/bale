@@ -4,10 +4,11 @@ A binary executable that compiles modules of C++ code.
 
 # MOTIVATION
 C++ does not have a module system. Libs and a linker do not constitute a
-module system. The ideas in this project are a subset of the ideas from
+module system. The ideas in this project was inspied by 
 [`this`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2073.pdf), 
-[`this`](http://isocpp.org/files/papers/n4214.pdf) and clang's 
-[`experimental module implementation`](http://clang.llvm.org/docs/Modules.html).
+[`this`](http://isocpp.org/files/papers/n4214.pdf), clang's 
+[`experimental module implementation`](http://clang.llvm.org/docs/Modules.html)
+and the node.js [`module system`](http://nodejs.org/api/modules.html).
 
 
 # STATUS
