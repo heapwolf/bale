@@ -81,8 +81,7 @@ void resolveImport(const char* path, Callback<fs::Error, const string> cb) {
     filesystem.stat(string(p + "/cc_modules").c_str(), [&](auto err, auto stats) {
       if (err) {
 
-        unsigned found = p.find_last_of("/\\");
-        string parent = p.substr(0, found);
+        string parent = p.substr(0, p.find_last_of("/\\"));
 
         if (parent.length() == 0) {
           die();
@@ -128,7 +127,7 @@ void createClassIds(const char* value, Callback<fs::Error> cb) {
 
       if (import_cache.find(value) == import_cache.end()) {
 
-        string id = "MODULE" + to_string(depth) + "_H";
+        string id = "MODULE" + to_string(depth);
         import_cache.insert({ value, make_pair(path, id) });
       }
 
@@ -153,6 +152,25 @@ void createClassIds(const char* value, Callback<fs::Error> cb) {
   });
 }
 
+
+void ensurePath(string path) {
+
+  istringstream ss(path.substr(0, path.find_last_of("/\\")));
+  string token;
+  string tmp;
+
+  while (std::getline(ss, token, '/')) {
+    tmp += token + "/";
+    try {
+      filesystem.statSync(tmp.c_str());
+    }
+    catch(...) {
+      filesystem.mkdirSync(tmp.c_str());
+    }
+  }
+}
+
+
 void rewriteFiles(const char* path, Callback<fs::Error> cb) {
 
   int cache_size = import_cache.size();
@@ -160,13 +178,13 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
 
   for (auto& import : import_cache) {
 
-      auto filepath = get<0>(import.second);
-      auto id = get<1>(import.second);
+    auto filepath = get<0>(import.second);
+    auto id = get<1>(import.second);
 
     filesystem.readFile(filepath.c_str(), [&](auto err, auto data) {
       auto imports = find_imports(data);
 
-      if (id != "MODULE1_H")
+      if (id != "MODULE1")
         data = wrap(data, get<1>(import.second));
 
       for (auto& i : imports) {
@@ -180,28 +198,33 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
         data = regex_replace(data, regex(i.first), statement);
       }
 
-      string filename = (id != "MODULE1_H")
-        ? string(filepath) + ".h"
-        : string(filepath)
-      ;
+      string filename;
 
-      if (filename[0] == '/') {
-        filename = filename.substr(
-          filesystem.cwd().length(), 
-          filename.length()
-        );
+      if (id != "MODULE1") {
+        filename = string(filepath) + ".h";
+
+        if (filename[0] == '/') {
+          filename = filename.substr(
+            filesystem.cwd().length(), 
+            filename.length()
+          );
+        }
+        else if (filename[0] == '.') {
+          filename = filename.substr(
+            1,
+            filename.length()
+          );
+        }
+
+        filename = "./cc_modules/.build" + filename;
       }
-      else if (filename[0] == '.') {
-        filename = filename.substr(
-          1,
-          filename.length()
-        );
+      else {
+        filename = string(path);
       }
-    
-      filename = path + filename;
-        
+
       log << log.info << "Writing " << filename << endl;
 
+      ensurePath(filename);
       filesystem.writeFile(filename.c_str(), data, [&](auto err) {
 
         if (err) {
@@ -213,7 +236,6 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
           cb(err);
         }
       });
-
     });
   }
 }
@@ -228,7 +250,8 @@ int main(int argc, char* argv[]) {
 
   auto die = [=](auto err) {
     if (err.message == "ENOENT") {
-      log << log.error << "the file " << argv[1] << " could not be read." << endl;
+      // TODO the message should say what file
+      log << log.error << "the file could not be read." << endl;
       exit(1);
     }
     else {

@@ -1,15 +1,15 @@
-#ifndef MODULE2_H
-#define MODULE2_H
+#ifndef MODULE2
+#define MODULE2
 #include <iostream>
 
-class MODULE2_H {
+class MODULE2 {
 
   // inlcudes get hoisted
 
   // introduce a second level of depth
   // in this case an implicitly private
   // instance of `B`.
-  MODULE3_H B;
+  MODULE3 B;
 
   // implicitly private
   int pnum1 = 10;

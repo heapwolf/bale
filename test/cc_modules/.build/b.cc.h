@@ -1,6 +1,6 @@
-#ifndef MODULE3_H
-#define MODULE3_H
-class MODULE3_H {
+#ifndef MODULE3
+#define MODULE3
+class MODULE3 {
 
   int num = 10;
 

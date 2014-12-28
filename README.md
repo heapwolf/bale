@@ -14,23 +14,42 @@ module system. The ideas in this project are a subset of the ideas from
 Experimental. A work in progress.
 
 
-# EXAMPLE MODULE USAGE
+# EXAMPLE
 A modue is a discrete unit of code, encapsulated in a file, which exposes at 
-least one public value or function. 
+least one public value, function, class, etc. Let's use the following file 
+strcture as an example.
+
+```
+main.cc
+helloworld.cc
+awesome.cc
+cc_modules/
+  math/
+    index.cc
+```
 
 
 ## ./MAIN.CC
 This is the entry point for your program.
 
 ```cpp
-// import local file (./helloworld.cc) as hello
+//
+// import the file "helloworld.cc" as "hello".
+//
 import hello "./helloworld.cc";
+
+//
+// import the module "math" as "math".
+//
+import math "math";
 
 int main() {
   hello.doSomething("something");
+  math.add(2, 2);
 }
 ```
-
+To understand how a `module` is imported, read 
+[`this`](http://nodejs.org/api/modules.html#modules_loading_from_node_modules_folders).
 
 ## ./HELLOWORLD.CC
 The module imported by the code in `main.cc`.
@@ -58,7 +77,7 @@ export {
   int num = 10;
 
   //
-  // import ./awesome.cc 
+  // import the file "./awesome.cc" as "awesome"
   //
   import awesome "./awesome.cc";
 
@@ -102,7 +121,7 @@ bale <input-file> <output-directory>
 
 ### EXAMPLE
 ```bash
-bale ./main.cc ./out
-g++ ./out/main.cc -std=c++1y -o main -include-pch ./out
+bale main.cc out.cc
+g++ out.cc -std=c++1y -o main -include-pch cc_modues/.build
 ```
 

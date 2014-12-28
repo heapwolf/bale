@@ -1,8 +1,8 @@
-#ifndef MODULE4_H
-#define MODULE4_H
+#ifndef MODULE4
+#define MODULE4
 #include <iostream>
 
-class MODULE4_H {
+class MODULE4 {
   public:
     void printNumber() {
       cout << 10 << endl;

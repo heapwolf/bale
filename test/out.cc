@@ -1,7 +1,7 @@
 #include <functional>
 
-MODULE2_H a;
-MODULE4_H simple;
+MODULE2 a;
+MODULE4 simple;
 
 int main() {
 
