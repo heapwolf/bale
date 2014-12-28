@@ -15,7 +15,7 @@ Experimental. A work in progress.
 
 
 # EXAMPLE
-A modue is a discrete unit of code, encapsulated in a file, which exposes at 
+A modue is a discrete unit of code, encapsulated in a file. It exposes at 
 least one public value, function, class, etc. Let's use the following file 
 strcture as an example.
 
@@ -30,7 +30,7 @@ cc_modules/
 
 
 ## ./MAIN.CC
-This is the entry point for your program.
+Typical entry point for most programs.
 
 ```cpp
 //
@@ -44,7 +44,7 @@ import hello "./helloworld.cc";
 import math "math";
 
 int main() {
-  hello.doSomething("something");
+  hello.greeting("hola");
   math.add(2, 2);
 }
 ```
@@ -114,7 +114,18 @@ export {
 ```
 
 
-## USAGE
+## ./CC_MODULES/MATH/INDEX.CC
+```cpp
+export {
+  public:
+    int add(int a, int b) {
+      return a+b;
+    }
+}
+```
+
+
+# USAGE
 It's important to tell `gcc`, `clang` (or whatever) where your 
 precompiled headers can be found...
 
@@ -123,7 +134,7 @@ bale input.cc output.cc
 ```
 
 
-### EXAMPLE
+## EXAMPLE
 ```bash
 bale main.cc build.cc
 g++ build.cc -std=c++1y -o main -include-pch cc_modues/.build
