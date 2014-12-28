@@ -29,7 +29,7 @@ regex exportEndRE("\\}(\\s*)$");
 
 string wrap(string str, string name) {
 
-  str = "#ifndef " + name + "\n#define " + name + "\n" + str;
+  str = "#ifndef " + name + "_h\n#define " + name + "_h\n" + str;
   str = regex_replace(str, exportStartRE, "class " + name + " {");
   str = regex_replace(str, exportEndRE, "};\n#endif\n\n");
   return str;
@@ -56,100 +56,74 @@ Imports find_imports (string data) {
 }
 
 
-void resolveImport(const char* path, Callback<fs::Error, const string> cb) {
+string resolveImport(const char* path) {
 
   bool isPath = path[0] == '/' || path[0] == '.';
   fs::Error pathReference;
 
   if (isPath) {
-    cb(pathReference, string(path));
-    return;
+    return path;
   }
 
   string name = string(path);
 
   auto die = [&]() {
-    fs::Error notFound;
-    notFound.message = "Module not found: " + name;
-    notFound.code = 1;
-    cb(notFound, name); 
+    throw runtime_error("Module not found: " + name);
   };
 
-  function<void(string)> visit;
+  function<string(string)> visit;
   visit = [&](string p) {
 
-    filesystem.stat(string(p + "/cc_modules").c_str(), [&](auto err, auto stats) {
-      if (err) {
+    string newpath = p + "/cc_modules/" + name + "/index.cc";
 
-        string parent = p.substr(0, p.find_last_of("/\\"));
+    try {
+      filesystem.statSync(newpath.c_str());
+    }
+    catch(...) {
 
-        if (parent.length() == 0) {
-          die();
-          return;
-        }
-
-        visit(parent); 
+      string parent = p.substr(0, p.find_last_of("/\\"));
+      
+      if (parent.length() == 0) {
+        die();
       }
-
-      string newpath = p + "/cc_modules/" + name + "/index.cc";
-      filesystem.stat(newpath.c_str(), [&](auto err, auto stats) {
-        if (err) {
-          die();
-          return;
-        }
-        cb(err, newpath);
-      });
-    });
+      return visit(parent);
+    }
+    return newpath;
   };
   
-  visit(filesystem.cwd());
+  return visit(filesystem.cwd());
 }
 
 
-void createClassIds(const char* value, Callback<fs::Error> cb) {
+void createClassIds(const char* value) {
 
-  resolveImport(value, [&](auto err, auto path) {
-    if (err) {
-      cb(err);
-      return;
-    }
+  string path = resolveImport(value);
+  uv_buf_t buffer;
 
-    filesystem.readFile(path.c_str(), [&](auto err, auto data) {
-      if (err) {
-        cb(err);
-        return;
-      }
+  try {
+    buffer = filesystem.readFileSync(path.c_str());
+  }
+  catch(...) {
+    return;
+  }
 
-      depth++;
+  string data = string(buffer.base);
 
-      auto imports = find_imports(data);
-      int counter = imports.size();
+  depth++;
 
-      if (import_cache.find(value) == import_cache.end()) {
+  auto imports = find_imports(data);
+  auto counter = imports.size();
 
-        string id = "MODULE" + to_string(depth);
-        import_cache.insert({ value, make_pair(path, id) });
-      }
+  if (import_cache.find(value) == import_cache.end()) {
 
-      if (counter == 0) {
-        cb(err);
-        return;
-      }
+    string id = "module" + to_string(depth);
+    import_cache.insert({ value, make_pair(path, id) });
+  }
 
-      for (auto& import : imports) {
-
-        auto path = get<1>(import.second).c_str();
-
-        createClassIds(path, [&](auto err) {
-          counter = counter - 1;
-          if (counter == 0) {
-            cb(err);
-          }
-        });
-      }
-
-    });
-  });
+  for (auto& import : imports) {
+    auto path = get<1>(import.second).c_str();
+    createClassIds(path);
+  }
 }
 
 
@@ -171,7 +145,7 @@ void ensurePath(string path) {
 }
 
 
-void rewriteFiles(const char* path, Callback<fs::Error> cb) {
+void rewriteFiles(const char* path) {
 
   int cache_size = import_cache.size();
   int index = 0;
@@ -181,64 +155,75 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
     auto filepath = get<0>(import.second);
     auto id = get<1>(import.second);
 
-    filesystem.readFile(filepath.c_str(), [&](auto err, auto data) {
-      auto imports = find_imports(data);
+    //ensurePath(filepath);
 
-      if (id != "MODULE1")
-        data = wrap(data, get<1>(import.second));
+    //if(filepath.length() == 0) {
+      //cout << path << endl;
+    //  continue;
+   // }
+ 
+    auto readBuffer = filesystem.readFileSync(filepath.c_str());
+    cout << "----" << endl;
+    cout << string(readBuffer.base);
+    cout << "----" << endl;
+    /* string data(readBuffer.base);
+    auto imports = find_imports(data);
 
-      for (auto& i : imports) {
-        // the identity of the new class 
-        auto importname = get<1>(import_cache[get<1>(i.second)]);
+    if (id != "module1")
+      data = wrap(data, get<1>(import.second));
 
-        // the actual path to the file
-        auto importpath = get<0>(import_cache[get<1>(i.second)]);
+    for (auto& i : imports) {
+      // the identity of the new class 
+      auto importname = get<1>(import_cache[get<1>(i.second)]);
 
-        string statement = importname + " " + get<0>(i.second) + ";";
-        data = regex_replace(data, regex(i.first), statement);
+      // the actual path to the file
+      auto importpath = get<0>(import_cache[get<1>(i.second)]);
+
+      string statement = importname + " " + get<0>(i.second) + ";";
+      data = regex_replace(data, regex(i.first), statement);
+    }
+
+    string filename;
+
+    if (id != "module") {
+      filename = string(filepath) + ".h";
+
+      if (filename[0] == '/') {
+        filename = filename.substr(
+          filesystem.cwd().length(), 
+          filename.length()
+        );
+      }
+      else if (filename[0] == '.') {
+        filename = filename.substr(
+          1,
+          filename.length()
+        );
       }
 
-      string filename;
+      filename = "./cc_modules/.build" + filename;
+    }
+    else {
+      filename = string(path);
+    }
 
-      if (id != "MODULE1") {
-        filename = string(filepath) + ".h";
+    ensurePath(filename);
 
-        if (filename[0] == '/') {
-          filename = filename.substr(
-            filesystem.cwd().length(), 
-            filename.length()
-          );
-        }
-        else if (filename[0] == '.') {
-          filename = filename.substr(
-            1,
-            filename.length()
-          );
-        }
+    log << log.info << "Writing " << filename << endl;
 
-        filename = "./cc_modules/.build" + filename;
-      }
-      else {
-        filename = string(path);
-      }
-
-      log << log.info << "Writing " << filename << endl;
-
-      ensurePath(filename);
-      filesystem.writeFile(filename.c_str(), data, [&](auto err) {
-
-        if (err) {
-          cb(err);
-          return;
-        }
-
-        if (++index == cache_size) {
-          cb(err);
-        }
-      });
-    });
+    //auto writeBuffer = filesystem.createBuffer(data);
+ 
+    try {
+      filesystem.writeFileSync(filename.c_str(), data);
+    }
+    catch(...) {
+      return;
+    } */
+ 
+    //string cmd = "CC -x c++-header " + filename + " -std=c++1y";
+    //auto i = system(cmd.c_str());
   }
-}
+} 
 
 
 int main(int argc, char* argv[]) {
@@ -248,23 +233,7 @@ int main(int argc, char* argv[]) {
     exit(1);
   }
 
-  auto die = [=](auto err) {
-    if (err.message == "ENOENT") {
-      // TODO the message should say what file
-      log << log.error << "the file could not be read." << endl;
-      exit(1);
-    }
-    else {
-      log << log.error << err.message << endl;
-      exit(1);
-    }
-  };
-
-  createClassIds(argv[1], [&](auto err) {
-    if (err) die(err);
-    rewriteFiles(argv[2], [&](auto err) {
-      if (err) die(err);
-    });
-  }); 
+  createClassIds(argv[1]);
+  rewriteFiles(argv[2]);
 }
 

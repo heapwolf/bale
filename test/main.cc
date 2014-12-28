@@ -1,11 +1,11 @@
 #include <functional>
 
 import a "./a.cc";
-import simple "simple";
+import math "math";
 
 int main() {
 
   a.func1("the number is ");
-  simple.printNumber();
+  math.add(2, 2);
 }
 
