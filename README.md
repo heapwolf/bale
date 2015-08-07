@@ -37,7 +37,7 @@ cc_modules/
 //
 // import the file "pizza.cc" as "pizza".
 //
-import cheese "./pizza.cc";
+import pizza "./pizza.cc";
 
 //
 // import the module "serve" as "serve".
