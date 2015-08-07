@@ -5,16 +5,18 @@
       'target_name': 'bale',
       'type': 'executable',
       'sources': [
-        './deps/nodeuv-fs/fs.h', 
+        './deps/nodeuv-fs/fs.h',
+        './deps/nodeuv-path/path.h',
+        './deps/nodeuv-path/src/path.cc',
         './deps/debug/debug.h',
-        './deps/json/json.h',
-        './deps/json/deps/json11/json11.cpp',
+        './deps/json11/json11.hpp',
+        './deps/json11/json11.cpp',
         './bale.cc',
       ],
       'include_dirs': [
+        './deps/json11',
         './deps/nodeuv-fs',
-        './deps/json/deps/json11',
-        './deps/json',
+        './deps/nodeuv-path',
         './deps/debug',
       ],
       'dependencies': [

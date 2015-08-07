@@ -1,63 +1,63 @@
 # SYNOPSIS
-A binary executable that transpiles modules of C++ code.
+A transpiler/module system polyfill for `C++`.
 
 
 # MOTIVATION
-C++ does not have a module system. Libs and a linker do not constitute a
-module system. The ideas in this project was inspied by 
+C++ does not have a real module system. One is in the works but in the
+meanwhile, here is a future-compatible polyfill. Inspired by 
 [`this`](http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2006/n2073.pdf), 
 [`this`](http://isocpp.org/files/papers/n4214.pdf), clang's 
 [`experimental module implementation`](http://clang.llvm.org/docs/Modules.html)
 and the node.js [`module system`](http://nodejs.org/api/modules.html).
 
 
-# STATUS
+# PROJECT STATUS
 Experimental. A work in progress.
 
 
 # EXAMPLE
 A modue is a discrete unit of code, encapsulated in a file. It exposes at 
 least one public value, function, class, etc. Let's use the following file 
-strcture as an example.
+strcture as an example...
 
 ```
-main.cc
-helloworld.cc
-awesome.cc
+index.cc
+pizza.cc
+cheese.cc
 cc_modules/
-  math/
+  serve/
     index.cc
 ```
 
 
-## ./MAIN.CC
-Typical entry point for most programs.
+## ./INDEX.CC
+`index.cc` is the typical entry point for most programs.
 
 ```cpp
 //
-// import the file "helloworld.cc" as "hello".
+// import the file "pizza.cc" as "pizza".
 //
-import hello "./helloworld.cc";
+import cheese "./pizza.cc";
 
 //
-// import the module "math" as "math".
+// import the module "serve" as "serve".
 //
-import math "math";
+import serve "serve";
 
 int main() {
-  hello.greeting("hola");
-  math.add(2, 2);
+  serve.plate(pizza.make());
 }
 ```
 To understand how the math `module` is imported, read 
 [`this`](http://nodejs.org/api/modules.html#modules_loading_from_node_modules_folders).
 
 
-## ./HELLOWORLD.CC
-The module imported by the code in `main.cc`.
+## ./PIZZA.CC
+The module imported by the code in `index.cc`.
 
 ```cpp
 #include <iostream>
+#include <math.h>
 
 //
 // GLOBAL SCOPE
@@ -76,20 +76,20 @@ export {
   // not exported, this applies to varibles imported from other 
   // modules.
   //
-  int num = 10;
+  const double pi = M_PI;
 
   //
-  // import the file "./awesome.cc" as "awesome"
+  // import the file "./cheese.cc" as "chz"
   //
-  import awesome "./awesome.cc";
+  import chz "./cheese.cc";
 
   //
   // Variables found after the "public:" label are exported!
   //
   public:
 
-    void doSomething(string s) {
-      std::cout << s << awesome.square(num) << endl;
+    int make(int qty) {
+      return qty * pi + chz.add(secret_sauce);
     }
 
   //
@@ -97,30 +97,30 @@ export {
   // by using the "private:" label.
   //
   private:
-    int x = 0;
+    int secret_sauce = 42;
 }
 ```
 
 
-## ./AWESOME.CC
-This file happens to be included by `helloworld.cc`.
+## ./CHEESE.CC
+This file happens to be included by `pizza.cc`.
 
 ```cpp
 export {
   public:
-    int square(int i) {
+    int add(int i) {
       return i*i;
     }
 }
 ```
 
 
-## ./CC_MODULES/MATH/INDEX.CC
+## ./CC_MODULES/SERVE/INDEX.CC
 ```cpp
 export {
   public:
-    int add(int a, int b) {
-      return a+b;
+    void plate(int pizza) {
+      cout << pizza << endl;
     }
 }
 ```
@@ -128,16 +128,7 @@ export {
 
 # USAGE
 ```bash
-bale input.cc output.cc
-```
-
-
-## EXAMPLE
-It's important to tell `gcc`, `clang` (or whatever you use) where 
-your precompiled headers can be found...
-
-```bash
-bale main.cc build.cc
-g++ build.cc -std=c++1y -o main -include-pch cc_modues/.build
+bale index.cc ./output
+g++ ./output/index.cc -std=c++1y -o index
 ```
 

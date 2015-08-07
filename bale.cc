@@ -5,16 +5,18 @@
 #include <map>
 #include "fs.h"
 #include "debug.h"
-#include "json.h"
+#include "json11.hpp"
+#include "path.h"
 
 using namespace std;
-using namespace fs;
-using namespace JSON;
+using namespace nodeuv;
+using namespace json11;
 
-Filesystem filesystem;
+Filesystem fs;
+Path p;
 Debug log("bale", Debug::verbose, std::cerr);
 
-typedef function<void(fs::Error)> Callback;
+typedef function<void(Error)> Callback;
 typedef vector<const string> Defines;
 typedef map<const string, pair<const string, const string> > Imports;
 
@@ -28,7 +30,6 @@ regex exportEndRE("\\}(\\s*)$");
 
 
 string wrap(string str, string name) {
-
   str = "#ifndef " + name + "\n#define " + name + "\n" + str;
   str = regex_replace(str, exportStartRE, "class " + name + " {");
   str = regex_replace(str, exportEndRE, "};\n#endif\n\n");
@@ -56,33 +57,35 @@ Imports find_imports (string data) {
 }
 
 
-void resolveImport(const char* path, Callback<fs::Error, const string> cb) {
+void resolveImport(string basePath, string name, Callback<Error, const string> cb) {
 
-  bool isPath = path[0] == '/' || path[0] == '.';
-  fs::Error pathReference;
+  bool isNamePath = name[0] == '/' || name[0] == '.';
+  Error pathReference;
 
-  if (isPath) {
-    cb(pathReference, string(path));
+  if (isNamePath) {
+
+    name = p.resolve(fs.cwd(), basePath, name);
+
+    cb(pathReference, name);
     return;
   }
 
-  string name = string(path);
-
   auto die = [&]() {
-    fs::Error notFound;
+    Error notFound;
     notFound.message = "Module not found: " + name;
     notFound.code = 1;
     cb(notFound, name); 
   };
 
   function<void(string)> visit;
-  visit = [&](string p) {
+  visit = [&](string pathPart) {
 
-    filesystem.stat(string(p + "/cc_modules").c_str(), [&](auto err, auto stats) {
+    auto next = p.join(pathPart, "/cc_modules/", name);
+
+    fs.stat(next, [&](auto err, auto stats) {
       if (err) {
 
-        string parent = p.substr(0, p.find_last_of("/\\"));
-
+        string parent = pathPart.substr(0, pathPart.find_last_of("/\\"));
         if (parent.length() == 0) {
           die();
           return;
@@ -91,30 +94,30 @@ void resolveImport(const char* path, Callback<fs::Error, const string> cb) {
         visit(parent); 
       }
 
-      string newpath = p + "/cc_modules/" + name + "/index.cc";
-      filesystem.stat(newpath.c_str(), [&](auto err, auto stats) {
+      string newPath = p.join(next, "/index.cc");
+      fs.stat(newPath, [&](auto err, auto stats) {
         if (err) {
           die();
           return;
         }
-        cb(err, newpath);
+        cb(err, newPath);
       });
     });
   };
-  
-  visit(filesystem.cwd());
+
+  visit(basePath);
 }
 
 
-void createClassIds(const char* value, Callback<fs::Error> cb) {
+void createClassIds(string basePath, string value, Callback<Error> cb) {
 
-  resolveImport(value, [&](auto err, auto path) {
+  resolveImport(basePath, value, [&](auto err, auto path) {
     if (err) {
       cb(err);
       return;
     }
 
-    filesystem.readFile(path.c_str(), [&](auto err, auto data) {
+    fs.readFile(path, [&](auto err, auto data) {
       if (err) {
         cb(err);
         return;
@@ -122,7 +125,7 @@ void createClassIds(const char* value, Callback<fs::Error> cb) {
 
       depth++;
 
-      auto imports = find_imports(data);
+      auto imports = find_imports(data.toString());
       int counter = imports.size();
 
       if (import_cache.find(value) == import_cache.end()) {
@@ -139,8 +142,7 @@ void createClassIds(const char* value, Callback<fs::Error> cb) {
       for (auto& import : imports) {
 
         auto path = get<1>(import.second).c_str();
-
-        createClassIds(path, [&](auto err) {
+        createClassIds(basePath, path, [&](auto err) {
           counter = counter - 1;
           if (counter == 0) {
             cb(err);
@@ -162,16 +164,16 @@ void ensurePath(string path) {
   while (std::getline(ss, token, '/')) {
     tmp += token + "/";
     try {
-      filesystem.statSync(tmp.c_str());
+      fs.statSync(tmp.c_str());
     }
     catch(...) {
-      filesystem.mkdirSync(tmp.c_str());
+      fs.mkdirSync(tmp.c_str());
     }
   }
 }
 
 
-void rewriteFiles(const char* path, Callback<fs::Error> cb) {
+void rewriteFiles(string basePath, string path, Callback<Error> cb) {
 
   int cache_size = import_cache.size();
   int index = 0;
@@ -181,11 +183,12 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
     auto filepath = get<0>(import.second);
     auto id = get<1>(import.second);
 
-    filesystem.readFile(filepath.c_str(), [&](auto err, auto data) {
-      auto imports = find_imports(data);
+    fs.readFile(filepath, [&](auto err, auto data) {
+      auto imports = find_imports(data.toString());
+      string output = data.toString();
 
       if (id != "MODULE1")
-        data = wrap(data, get<1>(import.second));
+        output = wrap(output, get<1>(import.second));
 
       for (auto& i : imports) {
         // the identity of the new class 
@@ -195,17 +198,17 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
         auto importpath = get<0>(import_cache[get<1>(i.second)]);
 
         string statement = importname + " " + get<0>(i.second) + ";";
-        data = regex_replace(data, regex(i.first), statement);
+        output = regex_replace(output, regex(i.first), statement);
       }
 
       string filename;
 
       if (id != "MODULE1") {
-        filename = string(filepath) + ".h";
+        filename = filepath + ".h";
 
-        if (filename[0] == '/') {
+        /* if (filename[0] == '/') {
           filename = filename.substr(
-            filesystem.cwd().length(), 
+            fs.cwd().length(), 
             filename.length()
           );
         }
@@ -217,15 +220,20 @@ void rewriteFiles(const char* path, Callback<fs::Error> cb) {
         }
 
         filename = "./cc_modules/.build" + filename;
+        */
       }
       else {
-        filename = string(path);
+        filename = filepath;
       }
+
+
+      filename = path + regex_replace(filename, regex(basePath), "");
 
       log << log.info << "Writing " << filename << endl;
 
       ensurePath(filename);
-      filesystem.writeFile(filename.c_str(), data, [&](auto err) {
+      
+      fs.writeFile(filename, output, [&](auto err) {
 
         if (err) {
           cb(err);
@@ -259,11 +267,17 @@ int main(int argc, char* argv[]) {
       exit(1);
     }
   };
+ 
+  auto input = p.resolve(fs.cwd(), argv[1]);
+  auto output = p.resolve(fs.cwd(), argv[2]);
+  auto basePath = p.resolve(fs.cwd(), p.dirname(argv[1]));
 
-  createClassIds(argv[1], [&](auto err) {
+  createClassIds(basePath, input, [&](auto err) {
     if (err) die(err);
-    rewriteFiles(argv[2], [&](auto err) {
+
+    rewriteFiles(basePath, output, [&](auto err) {
       if (err) die(err);
+
     });
   }); 
 }
