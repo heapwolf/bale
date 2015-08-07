@@ -9,6 +9,10 @@ gyp: deps/gyp
 deps/gyp:
 	git clone --depth 1 https://chromium.googlesource.com/external/gyp.git ./deps/gyp
 
+docopt: deps/docopt
+./deps/docopt:
+	git clone --depth 1 https://github.com/docopt/docopt.cpp ./deps/docopt
+
 nodeuv-path: deps/nodeuv-path
 ./deps/nodeuv-path:
 	git clone --depth 1 http://github.com/hij1nx/nodeuv-path ./deps/nodeuv-path

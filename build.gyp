@@ -5,6 +5,8 @@
       'target_name': 'bale',
       'type': 'executable',
       'sources': [
+        './deps/docopt/docopt.h',
+        './deps/docopt/docopt.cpp',
         './deps/nodeuv-fs/fs.h',
         './deps/nodeuv-path/path.h',
         './deps/nodeuv-path/src/path.cc',
@@ -14,6 +16,7 @@
         './bale.cc',
       ],
       'include_dirs': [
+        './deps/docopt',
         './deps/json11',
         './deps/nodeuv-fs',
         './deps/nodeuv-path',

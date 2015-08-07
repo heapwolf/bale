@@ -1,5 +1,5 @@
 bale
-test/output
+./build
 build
 deps
 *.sw*

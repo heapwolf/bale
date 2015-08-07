@@ -3,10 +3,12 @@
 #include <regex>
 #include <vector>
 #include <map>
+
 #include "fs.h"
 #include "debug.h"
 #include "json11.hpp"
 #include "path.h"
+#include "docopt.h"
 
 using namespace std;
 using namespace nodeuv;
@@ -177,6 +179,7 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
 
   int cache_size = import_cache.size();
   int index = 0;
+  Error error;
 
   for (auto& import : import_cache) {
 
@@ -184,11 +187,23 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
     auto id = get<1>(import.second);
 
     fs.readFile(filepath, [&](auto err, auto data) {
+
+      if (error && ++index == cache_size) {
+        cb(error);
+        return;
+      }
+
+      if (err) {
+        error = err;
+        return;
+      }
+
       auto imports = find_imports(data.toString());
       string output = data.toString();
 
-      if (id != "MODULE1")
+      if (id != "MODULE1") {
         output = wrap(output, get<1>(import.second));
+      }
 
       for (auto& i : imports) {
         // the identity of the new class 
@@ -201,47 +216,27 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
         output = regex_replace(output, regex(i.first), statement);
       }
 
-      string filename;
+      string filename = filepath;
 
       if (id != "MODULE1") {
-        filename = filepath + ".h";
-
-        /* if (filename[0] == '/') {
-          filename = filename.substr(
-            fs.cwd().length(), 
-            filename.length()
-          );
-        }
-        else if (filename[0] == '.') {
-          filename = filename.substr(
-            1,
-            filename.length()
-          );
-        }
-
-        filename = "./cc_modules/.build" + filename;
-        */
+        filename += ".h";
       }
-      else {
-        filename = filepath;
-      }
-
 
       filename = path + regex_replace(filename, regex(basePath), "");
 
       log << log.info << "Writing " << filename << endl;
 
       ensurePath(filename);
-      
+
       fs.writeFile(filename, output, [&](auto err) {
 
         if (err) {
-          cb(err);
+          error = err;
           return;
         }
 
         if (++index == cache_size) {
-          cb(err);
+          cb(error);
         }
       });
     });
@@ -249,28 +244,30 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
 }
 
 
-int main(int argc, char* argv[]) {
-
-  if (argc < 3) {
-    cerr << "Usage: bale <path/to/in.cc> <path/to/out.cc>" << endl;
-    exit(1);
-  }
+void build(string inputFile) {
 
   auto die = [=](auto err) {
     if (err.message == "ENOENT") {
-      // TODO the message should say what file
-      log << log.error << "the file could not be read." << endl;
+
+      log 
+        << log.error 
+        << "the file could not be read (" + inputFile + ")" 
+        << endl;
+
       exit(1);
     }
-    else {
+   else if (err) {
+
       log << log.error << err.message << endl;
       exit(1);
     }
   };
- 
-  auto input = p.resolve(fs.cwd(), argv[1]);
-  auto output = p.resolve(fs.cwd(), argv[2]);
-  auto basePath = p.resolve(fs.cwd(), p.dirname(argv[1]));
+
+  auto input = p.resolve(fs.cwd(), inputFile);
+  auto output = p.join(p.dirname(input), "./.build");
+  auto basePath = p.resolve(fs.cwd(), p.dirname(inputFile));
+
+  ensurePath(output);
 
   createClassIds(basePath, input, [&](auto err) {
     if (err) die(err);
@@ -278,7 +275,59 @@ int main(int argc, char* argv[]) {
     rewriteFiles(basePath, output, [&](auto err) {
       if (err) die(err);
 
+      // 
+      // TODO
+      // - parse package.json
+      // - recurse dependants depth-first
+      // - run scripts (ie "c++ -std=c++1y index.cc -o index")
+      //
+
     });
-  }); 
+  });
+}
+
+void install(string name) {
+
+  //
+  // TODO
+  // 
+  //
+  cout << name << endl;
+}
+
+int main(int argc, char* argv[]) {
+
+static const char USAGE[] =
+R"(bale
+
+    Usage:
+      bale (-i | install) [name]...
+      bale (-b | build) <FILE>
+      bale (-h | --help)
+      bale --version
+
+    Arguments:
+      FILE          input file
+
+    Options:
+      -h --help     Show this screen.
+      --version     Show version.
+)";
+
+  map<std::string, docopt::value> 
+  args = docopt::docopt(
+    USAGE,
+    { argv + 1, argv + argc },
+    true,
+    "Bale 1.0"
+  );
+
+  if (args.find("build")->second == (docopt::value) "true") {
+    build((string) args.find("<FILE>")->second.asString());
+  }
+  else if (args.find("install")->second == (docopt::value) "true") {
+    install((string) args.find("[name]")->second.asString());
+  }
+
 }
 
