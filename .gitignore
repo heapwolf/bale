@@ -1,5 +1,6 @@
 bale
-./build
+test/input/.build/
+test/input/bin/
 build
 deps
 *.sw*

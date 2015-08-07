@@ -3,7 +3,7 @@
 exports {
   public:
     void printNumber() {
-      cout << 10 << endl;
+      std::cout << 10 << std::endl;
     }
 }
 

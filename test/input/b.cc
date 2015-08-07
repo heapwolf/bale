@@ -4,7 +4,7 @@ export b {
 
   public:
 
-    void func() {
+    int func() {
       return num;
     }
 }

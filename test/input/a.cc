@@ -17,9 +17,9 @@ export A {
 
   // explicitly public
   public:
-    void func1(string s) {
-      std::cout << B.func() << endl;
-      std::cout << s << pb1 << endl;
+    void func1(std::string s) {
+      std::cout << B.func() << std::endl;
+      std::cout << s << pb1 << std::endl;
     }
 
     // a class that can be 
@@ -31,8 +31,8 @@ export A {
   private:
     // a few more private things...
     bool pb1;
-    void func2(string s) {
-      std::cout << s << endl;
+    void func2(std::string s) {
+      std::cout << s << std::endl;
     }
 }
 

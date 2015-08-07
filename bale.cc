@@ -2,6 +2,7 @@
 #include <string>
 #include <regex>
 #include <vector>
+#include <deque>
 #include <map>
 
 #include "fs.h"
@@ -23,6 +24,7 @@ typedef vector<const string> Defines;
 typedef map<const string, pair<const string, const string> > Imports;
 
 vector<const string> include_cache;
+deque<const string> include_dirs;
 map<const string, pair<const string, const string> > import_cache;
 int depth = 0;
 
@@ -32,7 +34,7 @@ regex exportEndRE("\\}(\\s*)$");
 
 
 string wrap(string str, string name) {
-  str = "#ifndef " + name + "\n#define " + name + "\n" + str;
+  str = "#ifndef __" + name + "_H\n#define __" + name + "_H\n" + str;
   str = regex_replace(str, exportStartRE, "class " + name + " {");
   str = regex_replace(str, exportEndRE, "};\n#endif\n\n");
   return str;
@@ -218,13 +220,14 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
 
       string filename = filepath;
 
-      if (id != "MODULE1") {
-        filename += ".h";
-      }
-
       filename = path + regex_replace(filename, regex(basePath), "");
 
-      log << log.info << "Writing " << filename << endl;
+      if (id != "MODULE1") {
+        filename += ".h";
+        include_dirs.push_front(filename);
+      }
+
+      //log << log.info << "Writing " << filename << endl;
 
       ensurePath(filename);
 
@@ -243,8 +246,82 @@ void rewriteFiles(string basePath, string path, Callback<Error> cb) {
   }
 }
 
+void build(string path) {
 
-void build(string inputFile) {
+  if (!system(NULL)) {
+    log 
+      << log.error 
+      << "A command processor is not available" 
+      << endl;
+
+    exit(EXIT_FAILURE);
+  }
+
+
+  //
+  // TODO
+  // clean this up...
+  //
+  try {
+
+    auto packagePath = p.join(path, "/package.json");
+    const string data = fs.readFileSync(packagePath).toString();
+
+    string parse_error;
+    Json package = Json::parse(data, parse_error);
+
+    string cmd = "";
+    auto name = package["name"].string_value();
+    auto engines = package["engines"].object_items();
+    auto flags = package["flags"].array_items();
+
+    // 
+    // TODO
+    // Test if the engine exists and that its version number
+    // is appropriate for building the current package.
+    // For now, just take whatever is in there and use it.
+    //
+    for (auto &engine : engines) {
+      cmd += engine.first + " ";
+    }
+
+    //
+    // Specify the program entry point
+    //
+    string builtPath = p.join(path, "./.build");
+    string mainFile = package["main"].string_value();
+    string indexPath = p.resolve(builtPath, mainFile);
+    cmd += indexPath + " ";
+
+    for (auto &flag : flags) {
+      cmd += flag.string_value() + " ";
+    }
+
+    //
+    // Specify the output
+    //
+    string binPath = p.resolve(path, package["bin"].string_value());
+    ensurePath(binPath);
+    cmd += "-o " + binPath + " ";
+
+    //
+    // Specify the include path
+    //
+    for (auto &include : include_dirs) {
+      cmd += "-include " + include + " ";
+    }
+    //cout << cmd << endl;
+    system(cmd.c_str());
+
+  }
+  catch(...) {
+    log << log.error << "Could not parse package.json" << endl;
+    exit(1);
+  }
+
+}
+
+void transpile(string inputFile) {
 
   auto die = [=](auto err) {
     if (err.message == "ENOENT") {
@@ -275,24 +352,47 @@ void build(string inputFile) {
     rewriteFiles(basePath, output, [&](auto err) {
       if (err) die(err);
 
-      // 
-      // TODO
-      // - parse package.json
-      // - recurse dependants depth-first
-      // - run scripts (ie "c++ -std=c++1y index.cc -o index")
-      //
-
+      build(p.dirname(input));
     });
   });
+}
+
+void run(string name) {
+
+  if (!system(NULL)) {
+    log 
+      << log.error 
+      << "A command processor is not available" 
+      << endl;
+
+    exit(EXIT_FAILURE);
+  }
+
+  auto packageName = p.join(fs.cwd(), "/package.json");
+
+  try {
+    const string data = fs.readFileSync(packageName).toString();
+    string parse_error;
+    Json package = Json::parse(data, parse_error);
+
+    auto script = package["scripts"][name].string_value();
+    system(script.c_str());
+  }
+  catch(...) {
+    //
+    // TODO
+    //
+  }
+
 }
 
 void install(string name) {
 
   //
   // TODO
-  // 
+  // http, connect to github, etc.
   //
-  cout << name << endl;
+  cout << "INSTALL" << name << endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -303,11 +403,14 @@ R"(bale
     Usage:
       bale (-i | install) [name]...
       bale (-b | build) <FILE>
+      bale (-r | run) <script>...
       bale (-h | --help)
       bale --version
 
     Arguments:
-      FILE          input file
+      [name]        name of the module to install.
+      FILE          an input file.
+      <script>      a string of bash script.
 
     Options:
       -h --help     Show this screen.
@@ -323,11 +426,13 @@ R"(bale
   );
 
   if (args.find("build")->second == (docopt::value) "true") {
-    build((string) args.find("<FILE>")->second.asString());
+    transpile((string) args.find("<FILE>")->second.asString());
   }
   else if (args.find("install")->second == (docopt::value) "true") {
     install((string) args.find("[name]")->second.asString());
   }
-
+  else if (args.find("script")->second == (docopt::value) "true") {
+    run((string) args.find("<script>")->second.asString());
+  }
 }
 

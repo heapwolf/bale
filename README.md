@@ -128,7 +128,6 @@ export {
 
 # USAGE
 ```bash
-bale index.cc ./output
-g++ ./output/index.cc -std=c++1y -o index
+bale ./test/input/index.cc
 ```
 
